@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: greentwin-ai-api
+    runtime: python
+    plan: free
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: WEATHER_PROVIDER
+        value: weatherapi
+      - key: GREENHOUSE_TYPE
+        value: medium
+      - key: TARGET_TEMPERATURE_C
+        value: "28"
+      - key: DEFAULT_LOCATION
+        value: Coimbatore, India
+      - key: WEATHERAPI_KEY
+        sync: false
+      - key: OPENWEATHERMAP_API_KEY
+        sync: false
