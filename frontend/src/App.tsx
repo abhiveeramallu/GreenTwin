@@ -720,48 +720,49 @@ function App() {
           </Panel>
         </section>
 
-        {/* ── History logs ── */}
-        <Panel
-          title="Historical Simulation Logs"
-          kicker="System Memory"
-          subtitle="Recent runs for reporting and validation. Starting Inside is the estimated greenhouse temperature when the run began, and Final Inside (Controlled) is the end-of-horizon controlled temperature after the cooling schedule settles."
-        >
-          <div className="overflow-x-auto rounded-xl">
-            <table className="data-table min-w-full">
-              <thead>
-                <tr>
-                  <th>Timestamp</th>
-                  <th>Location</th>
-                  <th>Starting Inside</th>
-                  <th>Final Inside (Controlled)</th>
-                  <th>Fan</th>
-                  <th>Spray</th>
-                  <th>Comfort</th>
-                  <th>Provider</th>
-                </tr>
-              </thead>
-              <tbody>
-                {dashboard?.logs.map((log) => (
-                  <tr key={log.id}>
-                    <td className="text-mist">{formatTimestamp(log.created_at)}</td>
-                    <td className="font-medium">{log.location_name}</td>
-                    <td>{formatNumber(log.inside_temp_c)}°C</td>
-                    <td className="font-medium">{formatNumber(log.peak_controlled_temp_c)}°C</td>
-                    <td><span className="font-mono text-[13px]">{formatNumber(log.recommended_fan_pct, 0)}%</span></td>
-                    <td><span className="font-mono text-[13px]">{formatNumber(log.recommended_spray_pct, 0)}%</span></td>
-                    <td>
-                      <span className={`font-semibold ${bandTone(log.comfort_band)}`}>
-                        {formatNumber(log.comfort_score, 0)}
-                      </span>
-                      <span className="ml-1.5 text-mist">/ {log.comfort_band}</span>
-                    </td>
-                    <td className="text-mist">{log.provider}</td>
+        {dashboard?.logs.length ? (
+          <Panel
+            title="Historical Simulation Logs"
+            kicker="System Memory"
+            subtitle="Recent runs for reporting and validation. Starting Inside is the estimated greenhouse temperature when the run began, and Final Inside (Controlled) is the end-of-horizon controlled temperature after the cooling schedule settles."
+          >
+            <div className="overflow-x-auto rounded-xl">
+              <table className="data-table min-w-full">
+                <thead>
+                  <tr>
+                    <th>Timestamp</th>
+                    <th>Location</th>
+                    <th>Starting Inside</th>
+                    <th>Final Inside (Controlled)</th>
+                    <th>Fan</th>
+                    <th>Spray</th>
+                    <th>Comfort</th>
+                    <th>Provider</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Panel>
+                </thead>
+                <tbody>
+                  {dashboard.logs.map((log) => (
+                    <tr key={log.id}>
+                      <td className="text-mist">{formatTimestamp(log.created_at)}</td>
+                      <td className="font-medium">{log.location_name}</td>
+                      <td>{formatNumber(log.inside_temp_c)}°C</td>
+                      <td className="font-medium">{formatNumber(log.peak_controlled_temp_c)}°C</td>
+                      <td><span className="font-mono text-[13px]">{formatNumber(log.recommended_fan_pct, 0)}%</span></td>
+                      <td><span className="font-mono text-[13px]">{formatNumber(log.recommended_spray_pct, 0)}%</span></td>
+                      <td>
+                        <span className={`font-semibold ${bandTone(log.comfort_band)}`}>
+                          {formatNumber(log.comfort_score, 0)}
+                        </span>
+                        <span className="ml-1.5 text-mist">/ {log.comfort_band}</span>
+                      </td>
+                      <td className="text-mist">{log.provider}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Panel>
+        ) : null}
 
         {/* ── Loading state ── */}
         {loading && !dashboard ? (

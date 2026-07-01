@@ -56,6 +56,15 @@ def _split_csv(raw_value: str | None, fallback: list[str]) -> list[str]:
     return values or fallback
 
 
+def _normalize_database_url(raw_value: str) -> str:
+    value = raw_value.strip()
+    if value.startswith("postgres://"):
+        return value.replace("postgres://", "postgresql+psycopg://", 1)
+    if value.startswith("postgresql://") and not value.startswith("postgresql+"):
+        return value.replace("postgresql://", "postgresql+psycopg://", 1)
+    return value
+
+
 @dataclass(frozen=True)
 class Settings:
     app_name: str
@@ -70,6 +79,7 @@ class Settings:
     openweathermap_key: str | None
     cors_origins: list[str]
     enable_background_polling: bool
+    enable_log_storage: bool
     weather_timeout_seconds: float
 
 
@@ -84,7 +94,7 @@ settings = Settings(
     default_greenhouse_type=os.getenv("GREENHOUSE_TYPE", "medium").strip().lower(),
     default_target_temp_c=float(os.getenv("TARGET_TEMPERATURE_C", "28")),
     default_poll_interval_seconds=max(30, int(os.getenv("GREENTWIN_POLL_INTERVAL_SECONDS", "60"))),
-    database_url=os.getenv("DATABASE_URL", f"sqlite:///{DEFAULT_SQLITE_PATH}"),
+    database_url=_normalize_database_url(os.getenv("DATABASE_URL", f"sqlite:///{DEFAULT_SQLITE_PATH}")),
     weatherapi_key=os.getenv("WEATHERAPI_KEY"),
     openweathermap_key=os.getenv("OPENWEATHERMAP_API_KEY"),
     cors_origins=_split_csv(
@@ -98,5 +108,6 @@ settings = Settings(
     ),
     enable_background_polling=os.getenv("GREENTWIN_ENABLE_BACKGROUND_POLLING", "true").strip().lower()
     not in {"0", "false", "no"},
+    enable_log_storage=os.getenv("GREENTWIN_ENABLE_LOG_STORAGE", "true").strip().lower() not in {"0", "false", "no"},
     weather_timeout_seconds=float(os.getenv("GREENTWIN_WEATHER_TIMEOUT_SECONDS", "12")),
 )

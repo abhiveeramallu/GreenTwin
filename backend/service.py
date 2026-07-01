@@ -70,7 +70,7 @@ class GreenTwinService:
             greenhouse_profiles=profiles,
         )
 
-    def get_dashboard(self, db: Session, request: DashboardRequest) -> DashboardResponse:
+    def get_dashboard(self, db: Session | None, request: DashboardRequest) -> DashboardResponse:
         key = (
             request.location.strip().lower(),
             request.provider.strip().lower(),
@@ -87,12 +87,14 @@ class GreenTwinService:
         self._cache[key] = (now, dashboard)
         return dashboard
 
-    def get_logs(self, db: Session, limit: int = 25) -> LogsResponse:
+    def get_logs(self, db: Session | None, limit: int = 25) -> LogsResponse:
+        if db is None or not settings.enable_log_storage:
+            return LogsResponse(items=[])
         stmt = select(SimulationLog).order_by(SimulationLog.created_at.desc()).limit(limit)
         rows = list(db.scalars(stmt))
         return LogsResponse(items=[self._serialize_log(row) for row in rows])
 
-    def _build_dashboard(self, db: Session, request: DashboardRequest) -> DashboardResponse:
+    def _build_dashboard(self, db: Session | None, request: DashboardRequest) -> DashboardResponse:
         weather_bundle = fetch_weather_bundle(provider=request.provider, location=request.location)
         greenhouse_profile = get_greenhouse_profile(request.greenhouse_type)
         forecast_points = self._interpolate_forecast(weather_bundle)
@@ -133,41 +135,42 @@ class GreenTwinService:
 
         final_controlled_temp_c = optimized_series[-1].inside_temp_c if optimized_series else current_inside_temp_c
 
-        log_row = SimulationLog(
-            provider=weather_bundle.current.provider,
-            location_name=weather_bundle.current.location_name,
-            greenhouse_type=greenhouse_profile.type,
-            outside_temp_c=weather_bundle.current.temp_c,
-            inside_temp_c=current_inside_temp_c,
-            humidity_pct=weather_bundle.current.humidity_pct,
-            wind_speed_kph=weather_bundle.current.wind_speed_kph,
-            cloud_cover_pct=weather_bundle.current.cloud_cover_pct,
-            uv_index=weather_bundle.current.uv_index,
-            target_temp_c=request.target_temp_c,
-            recommended_fan_pct=optimization.recommended_fan_pct,
-            recommended_spray_pct=optimization.recommended_spray_pct,
-            projected_energy_kwh=optimization.projected_energy_kwh,
-            projected_water_liters=optimization.projected_water_liters,
-            comfort_score=comfort.score,
-            comfort_band=comfort.band,
-            peak_uncontrolled_temp_c=max(point.inside_temp_c for point in uncontrolled_series),
-            peak_controlled_temp_c=final_controlled_temp_c,
-            current_payload=_jsonable(_model_dump(weather_bundle.current)),
-            simulation_payload=_jsonable(
-                {
-                    "forecast_points": [_model_dump(point) for point in forecast_points],
-                    "uncontrolled_series": [_model_dump(point) for point in uncontrolled_series],
-                    "optimized_series": [_model_dump(point) for point in optimized_series],
-                    "horizons": [_model_dump(point) for point in horizons],
-                    "optimization": _model_dump(optimization),
-                    "resource_summary": _model_dump(resource_summary),
-                    "comfort": _model_dump(comfort),
-                }
-            ),
-        )
-        db.add(log_row)
-        db.commit()
-        db.refresh(log_row)
+        if db is not None and settings.enable_log_storage:
+            log_row = SimulationLog(
+                provider=weather_bundle.current.provider,
+                location_name=weather_bundle.current.location_name,
+                greenhouse_type=greenhouse_profile.type,
+                outside_temp_c=weather_bundle.current.temp_c,
+                inside_temp_c=current_inside_temp_c,
+                humidity_pct=weather_bundle.current.humidity_pct,
+                wind_speed_kph=weather_bundle.current.wind_speed_kph,
+                cloud_cover_pct=weather_bundle.current.cloud_cover_pct,
+                uv_index=weather_bundle.current.uv_index,
+                target_temp_c=request.target_temp_c,
+                recommended_fan_pct=optimization.recommended_fan_pct,
+                recommended_spray_pct=optimization.recommended_spray_pct,
+                projected_energy_kwh=optimization.projected_energy_kwh,
+                projected_water_liters=optimization.projected_water_liters,
+                comfort_score=comfort.score,
+                comfort_band=comfort.band,
+                peak_uncontrolled_temp_c=max(point.inside_temp_c for point in uncontrolled_series),
+                peak_controlled_temp_c=final_controlled_temp_c,
+                current_payload=_jsonable(_model_dump(weather_bundle.current)),
+                simulation_payload=_jsonable(
+                    {
+                        "forecast_points": [_model_dump(point) for point in forecast_points],
+                        "uncontrolled_series": [_model_dump(point) for point in uncontrolled_series],
+                        "optimized_series": [_model_dump(point) for point in optimized_series],
+                        "horizons": [_model_dump(point) for point in horizons],
+                        "optimization": _model_dump(optimization),
+                        "resource_summary": _model_dump(resource_summary),
+                        "comfort": _model_dump(comfort),
+                    }
+                ),
+            )
+            db.add(log_row)
+            db.commit()
+            db.refresh(log_row)
 
         logs = self.get_logs(db=db, limit=12).items
         return DashboardResponse(

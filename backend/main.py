@@ -18,9 +18,9 @@ service = GreenTwinService()
 async def _poll_default_dashboard() -> None:
     while True:
         try:
-            with SessionLocal() as db:
+            if SessionLocal is None:
                 service.get_dashboard(
-                    db=db,
+                    db=None,
                     request=DashboardRequest(
                         location=settings.default_location,
                         provider=settings.default_weather_provider,
@@ -29,6 +29,18 @@ async def _poll_default_dashboard() -> None:
                         refresh=True,
                     ),
                 )
+            else:
+                with SessionLocal() as db:
+                    service.get_dashboard(
+                        db=db,
+                        request=DashboardRequest(
+                            location=settings.default_location,
+                            provider=settings.default_weather_provider,
+                            greenhouse_type=settings.default_greenhouse_type,
+                            target_temp_c=settings.default_target_temp_c,
+                            refresh=True,
+                        ),
+                    )
         except Exception:
             # Keep background polling alive even if one weather or database call fails.
             pass
@@ -37,7 +49,8 @@ async def _poll_default_dashboard() -> None:
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    Base.metadata.create_all(bind=engine)
+    if engine is not None:
+        Base.metadata.create_all(bind=engine)
     poll_task: asyncio.Task[None] | None = None
     if settings.enable_background_polling:
         poll_task = asyncio.create_task(_poll_default_dashboard())
@@ -90,7 +103,7 @@ def get_dashboard(
     target_temp_c: float = Query(default=settings.default_target_temp_c),
     inside_temp_c: float | None = Query(default=None),
     refresh: bool = Query(default=False),
-    db: Session = Depends(get_db),
+    db: Session | None = Depends(get_db),
 ) -> DashboardResponse:
     return service.get_dashboard(
         db=db,
@@ -106,10 +119,10 @@ def get_dashboard(
 
 
 @app.post(f"{settings.api_prefix}/simulate", response_model=DashboardResponse)
-def simulate_dashboard(payload: DashboardRequest, db: Session = Depends(get_db)) -> DashboardResponse:
+def simulate_dashboard(payload: DashboardRequest, db: Session | None = Depends(get_db)) -> DashboardResponse:
     return service.get_dashboard(db=db, request=payload)
 
 
 @app.get(f"{settings.api_prefix}/logs", response_model=LogsResponse)
-def get_logs(limit: int = Query(default=25, ge=1, le=100), db: Session = Depends(get_db)) -> LogsResponse:
+def get_logs(limit: int = Query(default=25, ge=1, le=100), db: Session | None = Depends(get_db)) -> LogsResponse:
     return service.get_logs(db=db, limit=limit)
